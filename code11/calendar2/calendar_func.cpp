@@ -91,8 +91,8 @@ void CalculateStemsBranches(int year, int *stems, int *branches)
     *stems = (7 + sc) % 10;
     *branches = (5 + sc) % 12;
 
-    if(*stems < 0)
+    if(*stems <= 0)
         *stems += 10;
-    if(*branches < 0)
+    if(*branches <= 0)
         *branches += 12;
 }
