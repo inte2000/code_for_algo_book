@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="UserMacros">
+    <FREEIMAGE_ROOT>E:\development\FreeImage-3.18.0</FREEIMAGE_ROOT>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <Link>
+      <AdditionalDependencies Condition=" '$(Configuration)' == 'Debug' ">FreeImage.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies Condition=" '$(Configuration)' == 'Release' ">FreeImage.lib;%(AdditionalDependencies)</AdditionalDependencies>
+
+      <AdditionalLibraryDirectories>$(FREEIMAGE_ROOT)\lib\$(PlatformTarget);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(FREEIMAGE_ROOT)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <PostBuildEvent>
+      <Message>copy FreeImage.dll from library directory to project directory</Message>
+      <Command Condition=" '$(Configuration)' == 'Debug' ">$(FREEIMAGE_ROOT)\post_build.bat "$(FREEIMAGE_ROOT)\lib\$(PlatformTarget)\FreeImage.dll" "$(OutDir)"</Command>
+      <Command Condition=" '$(Configuration)' == 'Release' ">$(FREEIMAGE_ROOT)\post_build.bat "$(FREEIMAGE_ROOT)\lib\$(PlatformTarget)\FreeImage.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <BuildMacro Include="FREEIMAGE_ROOT">
+      <Value>$(FREEIMAGE_ROOT)</Value>
+      <EnvironmentVariable>true</EnvironmentVariable>
+    </BuildMacro>
+  </ItemGroup>
+</Project>
