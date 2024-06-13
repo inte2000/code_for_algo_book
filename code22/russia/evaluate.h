@@ -13,7 +13,7 @@ int GetBoardBuriedHoles(RUSSIA_GAME *game, B_SHAPE *bs, int row, int col);
 int GetBoardWells(RUSSIA_GAME *game, B_SHAPE *bs, int row, int col);
 
 int EvaluateFunction(RUSSIA_GAME *game, B_SHAPE *bs, int row, int col);
-int PrioritySelection(RUSSIA_GAME *game, int r_index, int row, int col);
+int PrioritySelection(RUSSIA_GAME *game, B_SHAPE* bs, int row, int col);
 
 
 #endif //__EVALUATE_H__

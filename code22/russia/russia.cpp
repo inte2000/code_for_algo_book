@@ -8,7 +8,6 @@
 #include "type_def.h"
 #include "data_def.h"
 #include "evaluate.h"
-#include "test_evaluate.h"
 
 SHAPE_T testShape[] = { S_Z, S_S, S_O };
 SHAPE_T testShape2[] = { S_J, S_Z, S_J, S_Z, S_T, S_I, S_J, S_O, S_I, S_Z };
@@ -45,17 +44,17 @@ void GenerateShapeList(int count, std::vector<SHAPE_T>& sl)
 
 void ClearRowStatus(RUSSIA_GAME *game, int row)
 {
-    for(int i = 0; i < GAME_COL; i++)
+    for(int i = 1; i <= GAME_COL; i++)
     {
-        game->board[row + 1][i + 1] = S_NULL;
+        game->board[row][i] = S_NULL;
     }
 }
 
 void CopyRowStatus(RUSSIA_GAME *game, int from, int to)
 {
-    for(int i = 0; i < GAME_COL; i++)
+    for(int i = 1; i <= GAME_COL; i++)
     {
-        game->board[to + 1][i + 1] = game->board[from + 1][i + 1];
+        game->board[to][i] = game->board[from][i];
     }
 }
 
@@ -65,7 +64,7 @@ void AddShapeOnGame(RUSSIA_GAME *game, B_SHAPE *bs, int row, int col, bool temp)
     {
         for(int j = 0; j < bs->width; j++)
         {
-            game->board[row + i + 1][col + j + 1] += bs->shape[i][j];
+            game->board[row + i][col + j] += bs->shape[i][j];
         }
     }
     if(temp)
@@ -78,7 +77,7 @@ void AddShapeOnGame(RUSSIA_GAME *game, B_SHAPE *bs, int row, int col, bool temp)
     }
     if(game->top_row >= row)
     {
-        game->top_row = row;
+        game->top_row = row - 1;
         //if(temp)
         //std::cout << "AddShapeOnGame change top " << game->old_top_row << " -> " << game->top_row << std::endl;
     }
@@ -90,7 +89,7 @@ void RemoveShapeFromGame(RUSSIA_GAME *game, B_SHAPE *bs, int row, int col)
     {
         for(int j = 0; j < bs->width; j++)
         {
-            game->board[row + i + 1][col + j + 1] -= bs->shape[i][j];
+            game->board[row + i][col + j] -= bs->shape[i][j];
         }
     }
 
@@ -103,7 +102,7 @@ void RemoveShapeFromGame(RUSSIA_GAME *game, B_SHAPE *bs, int row, int col)
 
 void EliminateRow(RUSSIA_GAME *game,  int row)
 {
-    if((row == 0) || (row == game->top_row))
+    if(row == (game->top_row + 1))
     {
         ClearRowStatus(game, row);
     }
@@ -113,7 +112,7 @@ void EliminateRow(RUSSIA_GAME *game,  int row)
         {
             CopyRowStatus(game, i - 1, i);
         }
-        ClearRowStatus(game, game->top_row);
+        ClearRowStatus(game, game->top_row + 1);
     }
 }
 
@@ -127,7 +126,7 @@ void PutShapeInPlace(RUSSIA_GAME *game, B_SHAPE *bs, int row, int col)
     do
     {
         done = false;
-        for(int i = game->top_row; i < max_row; i++)
+        for(int i = game->top_row + 1; i < max_row; i++)
         {
             if(IsFullRowStatus(game, i))
             {
@@ -146,23 +145,21 @@ void PutShapeInPlace(RUSSIA_GAME *game, B_SHAPE *bs, int row, int col)
 
 int GetTouchStartRow(RUSSIA_GAME *game, B_SHAPE *bs)
 {
-    return game->top_row - bs->height;
+    int start_r = game->top_row - bs->height + 1;
+    if (start_r < 1)
+        start_r = 1;
+
+    return start_r;
 }
 
-bool CanShapeMoveDown(RUSSIA_GAME *game, B_SHAPE *bs, int row, int col)
+bool CanPutShapeOnPos(RUSSIA_GAME* game, B_SHAPE* bs, int row, int col)
 {
-    int shape[SHAPE_BOX][SHAPE_BOX] = { { 0 } };
-    
-    if((row + bs->height) >= GAME_ROW) /*已经到底部了*/
-        return false;
-
-    row++;
-    for(int i = 0; i < bs->height; i++)
+    for (int i = bs->height - 1; i >= 0; i--)
     {
-        for(int j = 0; j < bs->width; j++)
+        for (int j = 0; j < bs->width; j++)
         {
-            shape[i][j] = game->board[row + i + 1][col + j + 1] + bs->shape[i][j];
-            if((shape[i][j] > 1) && (shape[i][j] != S_B))
+            int pos = game->board[row + i][col + j] + bs->shape[i][j];
+            if (pos > 1) // 发生冲突
             {
                 return false;
             }
@@ -172,37 +169,46 @@ bool CanShapeMoveDown(RUSSIA_GAME *game, B_SHAPE *bs, int row, int col)
     return true;
 }
 
-/*rtn >= 0表示可以放下这个形状，< 0表示无法放下这个形状，可能到顶了*/
-int EvaluateShape(RUSSIA_GAME *game, B_SHAPE *bs, EVA_RESULT *result)
+int MoveDownShapeOnRow(RUSSIA_GAME *game, B_SHAPE *bs, int row, int col)
 {
-    int start_row = GetTouchStartRow(game, bs);
-    if(start_row < 0)
+    if (!CanPutShapeOnPos(game, bs, row, col))
         return -1;
 
-    for(int col = 0; col < (GAME_COL - bs->width + 1); col++)
+    //是否还能向下？如果能就再下降一行，直到停下
+    while(CanPutShapeOnPos(game, bs, row + 1, col))
+        row++;
+
+    return row;
+}
+
+/*rtn > 0表示可以放下这个形状，== 0表示无法放下这个形状，可能到顶了*/
+int EvaluateShape(RUSSIA_GAME *game, B_SHAPE *bs, EVA_RESULT *result)
+{
+    int shpatt = 0;
+    int start_row = GetTouchStartRow(game, bs);
+    for(int col = 1; col <= (GAME_COL - bs->width + 1); col++)
     {
-        int row = start_row;
-        //是否还能向下？如果能就再下降一行，直到停下
-        while(CanShapeMoveDown(game, bs, row, col))
+        int row = MoveDownShapeOnRow(game, bs, start_row, col);
+        if (row != -1)
         {
-            row++;
-        }
-        AddShapeOnGame(game, bs, row, col, true);
-        int values = EvaluateFunction(game, bs, row, col);
-        int prs = PrioritySelection(game, bs->r_index, row, col);
-        RemoveShapeFromGame(game, bs, row, col);
-        //std::cout << "r_index : " << bs->r_index << ", row = " << row << ", col = " << col << ", value = " << values << std::endl;
-        if((values > result->value) 
-            || ((values == result->value) && (prs > result->prs)))
-        {
-            result->row = row;
-            result->col = col;
-            result->value = values;
-            result->prs = prs;
+            AddShapeOnGame(game, bs, row, col, true);
+            int values = EvaluateFunction(game, bs, row, col);
+            int prs = PrioritySelection(game, bs, row, col);
+            RemoveShapeFromGame(game, bs, row, col);
+            //std::cout << "r_index : " << bs->r_index << ", row = " << row << ", col = " << col << ", value = " << values << std::endl;
+            if((values > result->value) 
+                || ((values == result->value) && (prs > result->prs)))
+            {
+                result->row = row;
+                result->col = col;
+                result->value = values;
+                result->prs = prs;
+            }
+            shpatt++;
         }
     }
 
-    return 1;
+    return shpatt;
 }
 
 bool ComputerAIPlayer(RUSSIA_GAME *game, SHAPE_T s)
@@ -249,7 +255,7 @@ void InitGame(RUSSIA_GAME *game)
         game->board[i][0] = S_B;
         game->board[i][BOARD_COL - 1] = S_B;
     }
-    for(int j = 1; j < BOARD_COL - 1; j++)
+    for(int j = 0; j < BOARD_COL; j++)
     {
         game->board[0][j] = S_B;
         game->board[BOARD_ROW - 1][j] = S_B;
@@ -293,20 +299,20 @@ int main(int argc, char* argv[])
     std::vector<SHAPE_T> shape_list;
     RUSSIA_GAME game;
 
-    //RunEvaluateTest();
-
     InitGame(&game);
 
-    GenerateShapeList(100000, shape_list);
-    //GenerateTestShapeList(testShape2, 10, shape_list);
+    GenerateShapeList(10000000, shape_list);
+    //GenerateTestShapeList(testShape3, 14, shape_list);
+    //GenerateTestShapeList(testShape4, 78, shape_list);
     for(int i = 0; i < static_cast<int>(shape_list.size()); i++)
     {
-        //PrintGame(&game, shape_list[i]);
         if(!ComputerAIPlayer(&game, shape_list[i]))
         {
             std::cout << "Failed at: " << i + 1 << " pieces!" << std::endl;
             break;
         }
+        if((i % 10000) == 0)
+            PrintGame(&game, shape_list[i]);
     }
     PrintGame(&game, S_NULL);
 
